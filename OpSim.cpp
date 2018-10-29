@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
             readyQueue = roundRobin(readyQueue);
         }
         else if (command.compare(0, 4, "exit") ==  0) {
-            cout << "\nExiting the Operating System";
+            cout << "\nExiting the Operating System\n";
             running = false;
         }
         else {
