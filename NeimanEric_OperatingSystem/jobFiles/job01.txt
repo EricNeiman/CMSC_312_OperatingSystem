@@ -1,9 +1,0 @@
-NAME potato
-LOAD 5892
-NAME tomato
-LOAD 4651
-NAME apple
-LOAD 3456
-NAME turtle
-LOAD 9782
-EXE
