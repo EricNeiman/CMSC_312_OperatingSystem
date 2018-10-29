@@ -1,0 +1,4 @@
+512
+CALCULATE 350
+OUT word processing
+CALCULATE 100

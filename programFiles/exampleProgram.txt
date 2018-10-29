@@ -1,0 +1,8 @@
+Line 01: Ram Usage (int)
+Line 02: script of operations
+Line 03: possible operations are
+Line 04: CALCULATE with parameter of number of cycles (int), runs for number of cycles
+Line 05: I/O no parameter, randomly generates and I?O exception (int), places process in a BLOCKED STATE
+Line 06: YIELD, pauses the running process giving priority to another process
+Line 07: OUT, prints out a message to screen, possibly the pid and all of its PCB information
+Line 08: Each program must contain at least one critical section and one critical section resolving scheme

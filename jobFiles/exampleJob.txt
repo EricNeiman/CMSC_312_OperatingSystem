@@ -1,0 +1,5 @@
+Line 01: NAME of first process (string)
+Line 02: LOAD number of cycles to load program (int)
+Line 03: NAME of second process (string)
+Line 04: LOAD number of cycles to load program (int)
+Line 05L Last line is just "EXE"
