@@ -7,6 +7,8 @@
 #include <fstream>
 #include <string>
 #include <queue>
+#include <semaphore.h>
+
 using namespace std;
 
 class Process{
@@ -16,24 +18,33 @@ public:
     int remainingCycles; // number of cycles remaining before a process is complete
     string processName; // name of the process
     string state; // state the process is in [new, running, waiting, ready, terminated]
+    int priority; // priority of the process: 0 = low, 1 = medium, 2 = high
+    int criticalStart; // critical section has a start cycle
+    int criticalLength; // critical section has a length in cycles
 
     // Process constructor
-	Process(int p, int tc, string name) {
+	Process(int p, int tc, string name, int pr, int cs, int cl) {
         pid = p;
         totalCycles = tc;
         remainingCycles = tc; // remainingCycles is always the same as totalCycles at creation
         processName = name;
+        priority = pr;
+        criticalStart = cs;
+        criticalLength = cl;
     }
 
     void printProcess() {
         cout << "\nProcess ID: " << pid;
         cout << "\nProcess Name: " << processName;
         cout << "\nRemaining Cycles: " << remainingCycles;
+        cout << "\nPriority: " << priority;
     }
 };
 
-// global variable
+// global variables
     int numberOfProcesses = 0; // keeps track of the number of process created thus far so the pids don't overlap
+    bool memory[256][8] = {false}; // initializes the memory array as 256 rows of 8, when a cell is marked as true it is being used, when it is false it is empty
+    sem_t semaphores[256][8];
 
 void helpMenu() {
     cout << "\nList of commands";
@@ -66,8 +77,17 @@ queue<Process> addUserProcess(queue<Process> rq, int numProc) {
     cout << "\nEnter the process name: ";
     string name;
     cin >> name;
-    cout << "Creating a process: " << name;
-    Process p = Process(pid, totalCycles, name);
+    cout << "\nEnter the process' priority: ";
+    int priority;
+    cin >> priority;
+    cout << "\nEnter the start cycle for the critical section: ";
+    int criticalStart;
+    cin >> criticalStart;
+    cout << "\nEnter the length of the critical section in cycles: ";
+    int criticalLength;
+    cin >> criticalLength;
+    cout << "\nCreating a process: " << name;
+    Process p = Process(pid, totalCycles, name, priority, criticalStart, criticalLength);
     rq.push(p);
     return rq;
 }
@@ -81,6 +101,12 @@ queue<Process> addFile(queue<Process> rq, string path) {
         string name = "default";
         string cycleString;
         int cycles = -1;
+        string priorityString;
+        int priority = -1;
+        string criticalStartString;
+        int criticalStart = 0;
+        string criticalLengthString;
+        int criticalLength = 0;
         while (line != "EXE") {
             jobFile >> line;
             if (line == "NAME") {
@@ -90,11 +116,18 @@ queue<Process> addFile(queue<Process> rq, string path) {
                 jobFile >> cycleString;
                 cycles = stoi(cycleString, nullptr, 10);
             }
+            if (line == "PRIORITY") {
+                jobFile >> priorityString;
+                priority = stoi(priorityString, nullptr, 10);
+            }
+            if (line == "CRITICAL") {
+                
+            }
             if (name != "default" && cycles >= 0) {
                 cout << "\nCreating Process from: " << path;
                 cout << "\nProcess Name: " << name;
                 cout << "\nNumber of Cycles: " << cycleString;
-                Process jobProcess = Process(numberOfProcesses, cycles, name);
+                Process jobProcess = Process(numberOfProcesses, cycles, name, priority, criticalStart, criticalLength);
                 rq.push(jobProcess);
                 numberOfProcesses++;
                 name = "default";
@@ -131,6 +164,7 @@ int main(int argc, char* argv[]) {
         else if (command == "run") {
             readyQueue = roundRobin(readyQueue);
         }
+        // pritority queue goes here
         else if (command.compare(0, 4, "exit") ==  0) {
             cout << "\nExiting the Operating System\n";
             running = false;
