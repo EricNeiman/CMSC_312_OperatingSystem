@@ -1,5 +1,5 @@
 /*      Eric Neiman
-*       CMSC 312, Intro to Operating Systems
+*       CMSC 312 Intro to Operating Systems
 *       Operating System Simulation Project Main file
 */
 
@@ -10,14 +10,20 @@
 #include <semaphore.h>
 
 using namespace std;
+enum state { newP, running, waiting, ready, terminated };
+// newP: the process is being created
+// running: instructions are being executed
+// waiting: the process is waiting for some event to occur
+// ready: the process is waiting to be assigned a to a processor (first time the process goes into memory))
+// terminated: the process has finished executing
 
-class Process{
+class Process {
 public:
     int pid; // process ID number
     int totalCycles; // total number of cycles it takes to finish a process
     int remainingCycles; // number of cycles remaining before a process is complete
     string processName; // name of the process
-    string state; // state the process is in [new, running, waiting, ready, terminated]
+    state pState; // state the process is in [ running, waiting, ready, terminated ] 
     int priority; // priority of the process: 0 = low, 1 = medium, 2 = high
     int criticalStart; // critical section has a start cycle
     int criticalLength; // critical section has a length in cycles
@@ -27,6 +33,7 @@ public:
         pid = p;
         totalCycles = tc;
         remainingCycles = tc; // remainingCycles is always the same as totalCycles at creation
+        pState = newP;
         processName = name;
         priority = pr;
         criticalStart = cs;
@@ -37,37 +44,47 @@ public:
         cout << "\nProcess ID: " << pid;
         cout << "\nProcess Name: " << processName;
         cout << "\nRemaining Cycles: " << remainingCycles;
+        cout << "\nState: " << pState;
         cout << "\nPriority: " << priority;
     }
-};
+}; // end of the process class
+
+
 
 // global variables
     int numberOfProcesses = 0; // keeps track of the number of process created thus far so the pids don't overlap
-    bool memory[256][8] = {false}; // initializes the memory array as 256 rows of 8, when a cell is marked as true it is being used, when it is false it is empty
-    sem_t semaphores[256][8];
+    int memory[256][8] = {-1}; // initializes the memory (RAM)
+    sem_t semaphores[256][8]; // 2d array of semaphores for locking down the corresponding memory locations
 
 void helpMenu() {
-    cout << "\nList of commands";
+    cout << "\nList of commands: help";
     cout << "\nAdd a job: add <path to jobFile>";
     cout << "\nCreate a process: create process";
-    cout << "\nRun the processes: run";
+    cout << "\nRun the round robing: run round";
 }
+
 
 queue<Process> roundRobin(queue<Process> rq) {
     int cycles = 50; // number of cycles before switching to the next process
     while (!rq.empty()) {
         Process current = rq.front(); // sets current to the front of the queue
         rq.pop(); // removes current from the queue
+        current.pState = running; // the current process is now running
         if (current.remainingCycles < cycles) {
             cout << "\nFinishing process " << current.processName << " pid: " << current.pid;
+            current.pState = terminated; // sets the processes state to terminated
         } else {
-            current.remainingCycles = current.remainingCycles - 50;
+            for (int i = 0; i < cycles; i++) {
+                current.remainingCycles = current.remainingCycles - 1; // accounts for the number of cycles that were just run
+            }
+            current.pState = ready; // the process is being put back into the ready queue
             cout << "\nRunning " << current.processName << " pid: " << current.pid << " has " << current.remainingCycles << " cycles left before it completes.";
             rq.push(current); // puts the current process at the back of the queue to wait for its turn again
         }
     }
     return rq; // returns and empty queue once the list is empty
 }
+
 
 queue<Process> addUserProcess(queue<Process> rq, int numProc) {
     int pid = numProc;
@@ -91,6 +108,7 @@ queue<Process> addUserProcess(queue<Process> rq, int numProc) {
     rq.push(p);
     return rq;
 }
+
 
 queue<Process> addFile(queue<Process> rq, string path) {
     ifstream jobFile; // creates input file stream
@@ -141,6 +159,7 @@ queue<Process> addFile(queue<Process> rq, string path) {
     return rq;
 }
 
+
 int main(int argc, char* argv[]) {
     bool running = true; // is the operating system running
     string command = "";
@@ -161,7 +180,7 @@ int main(int argc, char* argv[]) {
             readyQueue = addUserProcess(readyQueue, numberOfProcesses);
             numberOfProcesses++;
         }
-        else if (command == "run") {
+        else if (command == "run round") {
             readyQueue = roundRobin(readyQueue);
         }
         // pritority queue goes here
