@@ -17,6 +17,7 @@ enum state { newP, running, waiting, ready, terminated };
 // ready: the process is waiting to be assigned a to a processor (first time the process goes into memory))
 // terminated: the process has finished executing
 
+
 class Process {
 public:
     int pid; // process ID number
@@ -27,9 +28,10 @@ public:
     int priority; // priority of the process: 0 = low, 1 = medium, 2 = high
     int criticalStart; // critical section has a start cycle
     int criticalLength; // critical section has a length in cycles
+    int memory; // memory usage in MB
 
     // Process constructor
-	Process(int p, int tc, string name, int pr, int cs, int cl) {
+	Process(int p, int tc, string name, int pr, int cs, int cl, int m) {
         pid = p;
         totalCycles = tc;
         remainingCycles = tc; // remainingCycles is always the same as totalCycles at creation
@@ -38,6 +40,7 @@ public:
         priority = pr;
         criticalStart = cs;
         criticalLength = cl;
+        memory = m;
     }
 
     void printProcess() {
@@ -46,6 +49,9 @@ public:
         cout << "\nRemaining Cycles: " << remainingCycles;
         cout << "\nState: " << pState;
         cout << "\nPriority: " << priority;
+        cout << "\nCritical Start: " << criticalStart;
+        cout << "\nCritical Length: " << criticalLength;
+        cout << "\nMemory Usage in MB: " << memory;
     }
 }; // end of the process class
 
@@ -55,38 +61,52 @@ public:
     int numberOfProcesses = 0; // keeps track of the number of process created thus far so the pids don't overlap
     int memory[256][8] = {-1}; // initializes the memory (RAM)
     sem_t semaphores[256][8]; // 2d array of semaphores for locking down the corresponding memory locations
+    queue<Process> readyQueue; // empty readyQueue for processes
 
 void helpMenu() {
     cout << "\nList of commands: help";
     cout << "\nAdd a job: add <path to jobFile>";
     cout << "\nCreate a process: create process";
-    cout << "\nRun the round robing: run round";
+    cout << "\nRun the round robin: run round";
 }
 
 
-queue<Process> roundRobin(queue<Process> rq) {
-    int cycles = 50; // number of cycles before switching to the next process
-    while (!rq.empty()) {
-        Process current = rq.front(); // sets current to the front of the queue
-        rq.pop(); // removes current from the queue
+void roundRobin() {
+    int cycles = 20; // number of cycles before switching to the next process
+    while (!readyQueue.empty()) {
+        Process current = readyQueue.front(); // sets current to the front of the queue
+        readyQueue.pop(); // removes current from the queue
         current.pState = running; // the current process is now running
-        if (current.remainingCycles < cycles) {
+
+        for (int i = 0; i < cycles; i++) { // for loop simulates running a cycle on the CPU
+            current.remainingCycles = current.remainingCycles - 1;
+            current.criticalStart = current.criticalStart -1; // if critical section gets to 0 the critical section has started
+            if (current.criticalStart == 0) {
+                cout << "\nCritical Section Started for process " << current.processName << ".";
+                break; // when the critical section starts we break from the normal cycle
+            }
+        }
+
+        if (current.criticalStart == 0) { // checks of critical start point has been reached and if there are still cycles left in the critical section
+            for (int i = 0; i < current.criticalLength; i++) {
+                    current.remainingCycles = current.remainingCycles - 1;
+            }
+        }
+
+        if (current.remainingCycles < 0) { // checks if the process has finished
             cout << "\nFinishing process " << current.processName << " pid: " << current.pid;
             current.pState = terminated; // sets the processes state to terminated
         } else {
-            for (int i = 0; i < cycles; i++) {
-                current.remainingCycles = current.remainingCycles - 1; // accounts for the number of cycles that were just run
-            }
             current.pState = ready; // the process is being put back into the ready queue
             cout << "\nRunning " << current.processName << " pid: " << current.pid << " has " << current.remainingCycles << " cycles left before it completes.";
-            rq.push(current); // puts the current process at the back of the queue to wait for its turn again
+            readyQueue.push(current); // puts the current process at the back of the queue to wait for its turn again
         }
     }
-    return rq; // returns and empty queue once the list is empty
+    return;
 }
 
 
-queue<Process> addUserProcess(queue<Process> rq, int numProc) {
+void addUserProcess(int numProc) {
     int pid = numProc;
     cout << "\nEnter the amount of cycles this process takes: ";
     int totalCycles;
@@ -103,14 +123,17 @@ queue<Process> addUserProcess(queue<Process> rq, int numProc) {
     cout << "\nEnter the length of the critical section in cycles: ";
     int criticalLength;
     cin >> criticalLength;
+    cout << "\nEnter the amount of memory in MB that the process will need: ";
+    int memory;
+    cin >> memory;
     cout << "\nCreating a process: " << name;
-    Process p = Process(pid, totalCycles, name, priority, criticalStart, criticalLength);
-    rq.push(p);
-    return rq;
+    Process p = Process(pid, totalCycles, name, priority, criticalStart, criticalLength, memory);
+    readyQueue.push(p);
+    return;
 }
 
 
-queue<Process> addFile(queue<Process> rq, string path) {
+void addFile(string path) {
     ifstream jobFile; // creates input file stream
     jobFile.open(path); // points jobFile to the path given
     if (jobFile.is_open()) {
@@ -122,9 +145,11 @@ queue<Process> addFile(queue<Process> rq, string path) {
         string priorityString;
         int priority = -1;
         string criticalStartString;
-        int criticalStart = 0;
+        int criticalStart = -1;
         string criticalLengthString;
         int criticalLength = 0;
+        string memoryString;
+        int memory = 1;
         while (line != "EXE") {
             jobFile >> line;
             if (line == "NAME") {
@@ -138,15 +163,23 @@ queue<Process> addFile(queue<Process> rq, string path) {
                 jobFile >> priorityString;
                 priority = stoi(priorityString, nullptr, 10);
             }
-            if (line == "CRITICAL") {
-                
+            if (line == "CRITICALS") {
+                jobFile >> criticalStartString;
+                criticalStart = stoi(criticalStartString, nullptr, 10);
             }
-            if (name != "default" && cycles >= 0) {
-                cout << "\nCreating Process from: " << path;
-                cout << "\nProcess Name: " << name;
-                cout << "\nNumber of Cycles: " << cycleString;
-                Process jobProcess = Process(numberOfProcesses, cycles, name, priority, criticalStart, criticalLength);
-                rq.push(jobProcess);
+            if (line == "CRITICALL") {
+                jobFile >> criticalLengthString;
+                criticalLength = stoi(criticalLengthString, nullptr, 10);
+            }
+            if (line == "MEMORY") {
+                jobFile >> memoryString;
+                memory = stoi(memoryString, nullptr, 10);
+            }
+            if (line == "-") {
+                cout << "\n\nCreating Process from: " << path;
+                Process jobProcess = Process(numberOfProcesses, cycles, name, priority, criticalStart, criticalLength, memory);
+                jobProcess.printProcess();
+                readyQueue.push(jobProcess);
                 numberOfProcesses++;
                 name = "default";
                 cycles = -1;
@@ -156,14 +189,13 @@ queue<Process> addFile(queue<Process> rq, string path) {
         cout << "\nFile not found"; // the path did not point to a file
     }
     jobFile.close(); // closes jobFile
-    return rq;
+    return;
 }
 
 
 int main(int argc, char* argv[]) {
     bool running = true; // is the operating system running
     string command = "";
-    queue<Process> readyQueue; // empty readyQueue for processes
 
     helpMenu(); // calls the help menu at the start of the application
     while (running) {
@@ -174,14 +206,14 @@ int main(int argc, char* argv[]) {
         }
         else if (command.compare(0, 4, "add ") == 0) {
             string pathToJob = command.substr(4, command.length());
-            readyQueue = addFile(readyQueue, pathToJob);
+            addFile(pathToJob);
         }
         else if (command == "create process") {
-            readyQueue = addUserProcess(readyQueue, numberOfProcesses);
+            addUserProcess(numberOfProcesses);
             numberOfProcesses++;
         }
         else if (command == "run round") {
-            readyQueue = roundRobin(readyQueue);
+            roundRobin();
         }
         // pritority queue goes here
         else if (command.compare(0, 4, "exit") ==  0) {
