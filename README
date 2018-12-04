@@ -1,0 +1,6 @@
+CMSC 312 Final Project Submission for Eric Neiman
+This project is an operating system simulator that can read in from a file to create processes, generate a set number of process, or take user input to make a process.
+There are two process schedulers in this application. A round robin scheduler that runs each process for 20 cycles and a priority oriented version of the round robin that gives higher priority processes more time on the cpu.
+Both schedulers avoid starvation however the priority based round robin scheduler is better because it allows for processes to have priorities.
+Each scheduler has mutex locks and unlocks in them to prevent the two threads that are being used to run each processor from trying to access the memory or the ready queue at the same time.
+There is no gui because I could not find a library that could run on my linux environment without excessive setup. Due to the amount of time I had left I chose to scrap the gui component. 
